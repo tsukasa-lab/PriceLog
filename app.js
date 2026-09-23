@@ -127,6 +127,7 @@ function taxOptions(selected) {
 
 function render() {
   const q = $('searchInput').value.trim().toLowerCase();
+  document.body.classList.toggle('focus-mode', !!openProductId);
   listEl.innerHTML = '';
 
   const visible = products.filter(p => !q || p.name.toLowerCase().includes(q));

@@ -1,4 +1,4 @@
-PriceLog Ver.0.2
+PriceLog Ver.0.3
 
 買い物中の価格比較に特化したPWA試作版です。
 
@@ -22,3 +22,8 @@ Folder: /(root)
 
 公開想定URL
 https://tsukasa-lab.github.io/PriceLog/
+
+Ver.0.3
+- スマホ横スクロール時に見出しと入力行を一緒に移動
+- 商品展開中は検索欄と他商品を薄暗く表示
+- 展開商品を枠と影で強調
