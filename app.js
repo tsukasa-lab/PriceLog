@@ -18,6 +18,8 @@ let editProductId = null;
 let saveTimer = null;
 let bulkMode = false;
 let bulkSelected = new Set();
+let storePurchaseMode = false;
+let openStoreName = null;
 
 const $ = (id) => document.getElementById(id);
 const listEl = $('productList');
@@ -34,6 +36,10 @@ $('btnBulkCancel').addEventListener('click', () => setBulkMode(false));
 $('btnBulkSelectAll').addEventListener('click', toggleBulkSelectAll);
 $('btnBulkAdd').addEventListener('click', bulkAddStore);
 $('btnLoadTemplate').addEventListener('click', loadProductTemplate);
+$('btnStorePurchase').addEventListener('click', () => setStorePurchaseMode(!storePurchaseMode));
+$('btnCloseStorePurchase').addEventListener('click', () => setStorePurchaseMode(false));
+$('storePurchaseSearch').addEventListener('input', renderStorePurchaseView);
+$('btnDeleteAllProducts').addEventListener('click', deleteAllProducts);
 $('btnSettings').addEventListener('click', openSettings);
 
 $('productForm').addEventListener('submit', (e) => {
@@ -170,7 +176,22 @@ function taxOptions(selected) {
 
 function render() {
   const q = $('searchInput').value.trim().toLowerCase();
-  document.body.classList.toggle('focus-mode', !!openProductId);
+
+  document.body.classList.toggle('focus-mode', !!openProductId && !storePurchaseMode);
+
+  $('storePurchaseView').classList.toggle('hidden', !storePurchaseMode);
+  $('productList').classList.toggle('hidden', storePurchaseMode);
+  $('searchInput').closest('.searchbar').classList.toggle('hidden', storePurchaseMode);
+  const legend = document.querySelector('.best-legend');
+  if (legend) legend.classList.toggle('hidden', storePurchaseMode);
+
+  if (storePurchaseMode) {
+    $('emptyState').classList.add('hidden');
+    $('bulkStoreBar').classList.add('hidden');
+    renderStorePurchaseView();
+    return;
+  }
+
   listEl.innerHTML = '';
   listEl.classList.toggle('bulk-mode', bulkMode);
 
@@ -584,7 +605,179 @@ function formatHistoryDate(iso) {
   return `${y}/${m}/${day} ${h}:${min}`;
 }
 
+function setStorePurchaseMode(enabled) {
+  storePurchaseMode = !!enabled;
+
+  if (storePurchaseMode) {
+    bulkMode = false;
+    bulkSelected.clear();
+    openProductId = null;
+    $('btnBulkStore').textContent = '一括店舗';
+    $('btnStorePurchase').textContent = '購入品中';
+  } else {
+    openStoreName = null;
+    $('storePurchaseSearch').value = '';
+    $('btnStorePurchase').textContent = '店舗購入品';
+  }
+
+  render();
+}
+
+function buildStorePurchaseMap() {
+  const map = new Map();
+
+  products.forEach(product => {
+    const bests = getBests(product);
+    if (!bests.before) return;
+
+    const addItem = (entry, mark) => {
+      const storeName = String(entry.store || '').trim() || '店舗未入力';
+      if (!map.has(storeName)) map.set(storeName, []);
+      map.get(storeName).push({
+        product,
+        row: entry.row,
+        calc: entry.calc,
+        mark
+      });
+    };
+
+    addItem(bests.before, '★');
+    if (bests.after) addItem(bests.after, '◆');
+  });
+
+  return map;
+}
+
+function renderStorePurchaseView() {
+  const container = $('storePurchaseList');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  const q = $('storePurchaseSearch').value.trim().toLowerCase();
+  const storeMap = buildStorePurchaseMap();
+
+  const stores = Array.from(storeMap.entries())
+    .filter(([storeName]) => !q || storeName.toLowerCase().includes(q))
+    .sort((a, b) => a[0].localeCompare(b[0], 'ja', { sensitivity: 'base', numeric: true }));
+
+  $('storePurchaseEmpty').classList.toggle('hidden', stores.length !== 0);
+
+  stores.forEach(([storeName, items]) => {
+    items.sort((a, b) => compareProducts(a.product, b.product));
+
+    const card = document.createElement('article');
+    card.className = 'store-card';
+    if (openStoreName === storeName) card.classList.add('open');
+
+    const summary = document.createElement('button');
+    summary.type = 'button';
+    summary.className = 'store-summary';
+
+    const name = document.createElement('span');
+    name.className = 'store-summary-name';
+    name.textContent = storeName;
+
+    const count = document.createElement('span');
+    count.className = 'store-summary-count';
+    const starCount = items.filter(item => item.mark === '★').length;
+    const diamondCount = items.filter(item => item.mark === '◆').length;
+    const parts = [];
+    if (starCount) parts.push(`★${starCount}`);
+    if (diamondCount) parts.push(`◆${diamondCount}`);
+    count.textContent = `${parts.join(' / ')}　計${items.length}品`;
+
+    const chev = document.createElement('span');
+    chev.className = 'store-summary-chev';
+    chev.textContent = '›';
+
+    summary.append(name, count, chev);
+    summary.addEventListener('click', () => {
+      openStoreName = openStoreName === storeName ? null : storeName;
+      renderStorePurchaseView();
+    });
+
+    card.appendChild(summary);
+
+    if (openStoreName === storeName) {
+      const productList = document.createElement('div');
+      productList.className = 'store-product-list';
+
+      items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'store-product-row';
+
+        const mark = document.createElement('span');
+        mark.className = 'store-product-mark';
+        mark.textContent = item.mark;
+
+        const nameWrap = document.createElement('div');
+        nameWrap.className = 'store-product-name-wrap';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'store-product-check';
+        checkbox.setAttribute('aria-label', `${item.product.name}を買い物チェック`);
+
+        const productName = document.createElement('span');
+        productName.className = 'store-product-name';
+        productName.textContent = item.product.name;
+
+        const meta = document.createElement('span');
+        meta.className = 'store-product-meta';
+        meta.textContent = `${fmt(item.product.amount)}${item.product.unit}`;
+
+        nameWrap.append(checkbox, productName, meta);
+
+        const price = document.createElement('span');
+        price.className = 'store-product-price';
+        price.textContent =
+          `${fmtPrice(item.calc.grossBefore)}[${fmtPrice(item.calc.afterTotal)}](${fmtPriceDelta(item.calc.afterTotal - item.calc.grossBefore)})円`;
+
+        const unit = document.createElement('span');
+        unit.className = 'store-product-unit';
+        unit.textContent =
+          `${fmtUnit(item.calc.beforeUnit)}[${fmtUnit(item.calc.afterUnit)}](${fmtUnitDelta(item.calc.afterUnit - item.calc.beforeUnit)})円/${item.product.unit}`;
+
+        row.append(mark, nameWrap, price, unit);
+        productList.appendChild(row);
+      });
+
+      card.appendChild(productList);
+    }
+
+    container.appendChild(card);
+  });
+}
+
+function deleteAllProducts() {
+  const msg = $('deleteAllMessage');
+
+  if (!products.length) {
+    msg.textContent = '削除する商品はないよ。';
+    return;
+  }
+
+  const ok = window.confirm(
+    `登録中の${products.length}商品をすべて削除する？\n店舗価格と変更履歴も消えるよ。`
+  );
+
+  if (!ok) return;
+
+  products = [];
+  openProductId = null;
+  openStoreName = null;
+  bulkSelected.clear();
+
+  persistNow();
+  localStorage.setItem(INITIALIZED_KEY, '1');
+
+  msg.textContent = '全商品を削除したよ。';
+  render();
+}
+
 function setBulkMode(enabled) {
+  if (enabled) storePurchaseMode = false;
   bulkMode = !!enabled;
   if (!bulkMode) {
     bulkSelected.clear();
