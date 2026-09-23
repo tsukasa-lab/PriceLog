@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>PriceLog</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icon-192.png">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <strong>PriceLog</strong>
+      <small>Ver.0.2</small>
+    </div>
+    <div class="top-actions">
+      <button id="btnSettings" class="icon-btn" type="button" aria-label="設定">⚙</button>
+      <button id="btnAddProduct" class="primary mini" type="button">＋商品</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="searchbar">
+      <input id="searchInput" type="search" placeholder="商品を検索" autocomplete="off">
+      <span id="productCount" class="count"></span>
+    </section>
+
+    <section id="productList" class="product-list"></section>
+    <div id="emptyState" class="empty hidden">商品がまだないよ。「＋商品」から追加してね。</div>
+  </main>
+
+  <dialog id="productDialog" class="dialog">
+    <form id="productForm" method="dialog">
+      <div class="dialog-head">
+        <strong id="productDialogTitle">商品追加</strong>
+        <button class="icon-btn" value="cancel" type="submit" aria-label="閉じる">×</button>
+      </div>
+
+      <label>商品名
+        <input id="productName" required maxlength="60" placeholder="例：ブレンディ">
+      </label>
+
+      <div class="grid3">
+        <label>内容量
+          <input id="productAmount" required type="number" min="0.01" step="0.01" value="100">
+        </label>
+        <label>単位
+          <select id="productUnit">
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="個">個</option>
+            <option value="枚">枚</option>
+            <option value="本">本</option>
+            <option value="袋">袋</option>
+            <option value="箱">箱</option>
+          </select>
+        </label>
+        <label>既定税率
+          <select id="productTax"></select>
+        </label>
+      </div>
+
+      <div class="dialog-actions">
+        <button id="btnDeleteProduct" class="danger ghost hidden" type="button">商品削除</button>
+        <button class="primary" value="default" type="submit">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog" class="dialog">
+    <form id="settingsForm" method="dialog">
+      <div class="dialog-head">
+        <strong>設定</strong>
+        <button class="icon-btn" value="cancel" type="submit" aria-label="閉じる">×</button>
+      </div>
+
+      <div class="settings-block">
+        <div class="settings-title">消費税</div>
+        <div class="grid2">
+          <label>標準税率
+            <div class="suffix">
+              <input id="standardTax" type="number" min="0" max="100" step="0.1">
+              <span>%</span>
+            </div>
+          </label>
+          <label>軽減税率
+            <div class="suffix">
+              <input id="reducedTax" type="number" min="0" max="100" step="0.1">
+              <span>%</span>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-block">
+        <div class="settings-title">価格入力</div>
+        <label>初期状態
+          <select id="defaultPriceType">
+            <option value="inc">税込</option>
+            <option value="ex">税抜</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="settings-block">
+        <div class="settings-title">データ</div>
+        <div class="stack">
+          <button id="btnExport" class="ghost" type="button">バックアップを書き出す</button>
+          <label class="file-btn ghost">バックアップを読み込む
+            <input id="importFile" type="file" accept="application/json,.json">
+          </label>
+        </div>
+      </div>
+
+      <div class="dialog-actions">
+        <button class="primary" value="default" type="submit">設定を保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <template id="productTemplate">
+    <article class="product-card">
+      <button class="product-summary" type="button">
+        <span class="summary-main">
+          <span class="product-name"></span>
+          <span class="product-size"></span>
+        </span>
+        <span class="best-wrap">
+          <span class="best-store"></span>
+          <strong class="best-unit"></strong>
+        </span>
+        <span class="chev">›</span>
+      </button>
+
+      <div class="product-detail hidden">
+        <div class="detail-toolbar">
+          <button class="btn-edit-product ghost mini" type="button">商品設定</button>
+          <button class="btn-add-store primary mini" type="button">＋店舗</button>
+        </div>
+
+        <div class="store-head">
+          <span>店舗</span><span>価格</span><span>税込</span><span>税率</span><span>クーポン</span><span>値</span><span>単価</span><span></span>
+        </div>
+        <div class="store-list"></div>
+      </div>
+    </article>
+  </template>
+
+  <template id="storeTemplate">
+    <div class="store-row">
+      <input class="st-store" type="text" maxlength="40" placeholder="店舗">
+      <input class="st-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="価格">
+      <select class="st-price-type" aria-label="税込・税抜">
+        <option value="inc">込</option>
+        <option value="ex">抜</option>
+      </select>
+      <select class="st-tax" aria-label="税率"></select>
+      <select class="st-coupon-type" aria-label="クーポン">
+        <option value="none">なし</option>
+        <option value="percent">%OFF</option>
+        <option value="yen">円引</option>
+      </select>
+      <input class="st-coupon-value" type="number" min="0" step="0.01" inputmode="decimal" placeholder="-">
+      <output class="st-unit">-</output>
+      <button class="st-delete" type="button" aria-label="店舗行を削除">×</button>
+      <div class="store-sub">
+        <span class="st-total"></span>
+        <span class="st-before"></span>
+      </div>
+    </div>
+  </template>
+
+  <script src="./app.js"></script>
+</body>
+</html>
