@@ -15,6 +15,8 @@ let products = loadJson(STORAGE_KEY, []);
 let openProductId = null;
 let editProductId = null;
 let saveTimer = null;
+let bulkMode = false;
+let bulkSelected = new Set();
 
 const $ = (id) => document.getElementById(id);
 const listEl = $('productList');
@@ -26,6 +28,10 @@ render();
 
 $('searchInput').addEventListener('input', render);
 $('btnAddProduct').addEventListener('click', () => openProductDialog());
+$('btnBulkStore').addEventListener('click', () => setBulkMode(!bulkMode));
+$('btnBulkCancel').addEventListener('click', () => setBulkMode(false));
+$('btnBulkSelectAll').addEventListener('click', toggleBulkSelectAll);
+$('btnBulkAdd').addEventListener('click', bulkAddStore);
 $('btnSettings').addEventListener('click', openSettings);
 
 $('productForm').addEventListener('submit', (e) => {
@@ -151,6 +157,7 @@ function render() {
   const q = $('searchInput').value.trim().toLowerCase();
   document.body.classList.toggle('focus-mode', !!openProductId);
   listEl.innerHTML = '';
+  listEl.classList.toggle('bulk-mode', bulkMode);
 
   const visible = products
     .filter(p => !q || p.name.toLowerCase().includes(q) || (p.reading || '').toLowerCase().includes(q))
@@ -179,9 +186,20 @@ function render() {
     node.querySelector('.product-size').textContent = `${fmt(product.amount)}${product.unit}`;
 
     const bestStore = node.querySelector('.best-store');
+    const bestPrice = node.querySelector('.best-price');
     const bestUnit = node.querySelector('.best-unit');
     if (bests.before || bests.after) {
       bestStore.textContent = formatBestStores(bests);
+
+      const beforePriceRaw = bests.before ? bests.before.calc.grossBefore : null;
+      const afterPriceRaw = bests.after ? bests.after.calc.afterTotal : null;
+      const beforePriceValue = beforePriceRaw !== null ? fmtPrice(beforePriceRaw) : '-';
+      const afterPriceValue = afterPriceRaw !== null ? fmtPrice(afterPriceRaw) : '-';
+      const priceDiff = beforePriceRaw !== null && afterPriceRaw !== null
+        ? fmtPriceDelta(afterPriceRaw - beforePriceRaw)
+        : '-';
+      bestPrice.textContent = `${beforePriceValue}[${afterPriceValue}](${priceDiff})円`;
+
       const beforeRaw = bests.before ? bests.before.calc.beforeUnit : null;
       const afterRaw = bests.after ? bests.after.calc.afterUnit : null;
       const beforeValue = beforeRaw !== null ? fmtUnit(beforeRaw) : '-';
@@ -193,17 +211,35 @@ function render() {
       node.classList.add('has-best');
     } else {
       bestStore.textContent = '価格未登録';
+      bestPrice.textContent = '-';
       bestUnit.textContent = '-';
     }
 
+    const bulkWrap = node.querySelector('.bulk-check-wrap');
+    const bulkCheck = node.querySelector('.bulk-check');
+    bulkWrap.classList.toggle('hidden', !bulkMode);
+    bulkCheck.checked = bulkSelected.has(product.id);
+    bulkCheck.addEventListener('change', () => {
+      if (bulkCheck.checked) bulkSelected.add(product.id);
+      else bulkSelected.delete(product.id);
+      updateBulkSelectedCount();
+    });
+
     const summary = node.querySelector('.product-summary');
     summary.addEventListener('click', () => {
+      if (bulkMode) {
+        bulkCheck.checked = !bulkCheck.checked;
+        if (bulkCheck.checked) bulkSelected.add(product.id);
+        else bulkSelected.delete(product.id);
+        updateBulkSelectedCount();
+        return;
+      }
       openProductId = openProductId === product.id ? null : product.id;
       render();
     });
 
     const detail = node.querySelector('.product-detail');
-    const isOpen = openProductId === product.id;
+    const isOpen = !bulkMode && openProductId === product.id;
     detail.classList.toggle('hidden', !isOpen);
     node.classList.toggle('open', isOpen);
 
@@ -334,6 +370,20 @@ function refreshBestOnly(productId) {
   const hasBest = !!(bests.before || bests.after);
 
   card.querySelector('.best-store').textContent = hasBest ? formatBestStores(bests) : '価格未登録';
+
+  const bestPrice = card.querySelector('.best-price');
+  if (hasBest) {
+    const beforePriceRaw = bests.before ? bests.before.calc.grossBefore : null;
+    const afterPriceRaw = bests.after ? bests.after.calc.afterTotal : null;
+    const beforePriceValue = beforePriceRaw !== null ? fmtPrice(beforePriceRaw) : '-';
+    const afterPriceValue = afterPriceRaw !== null ? fmtPrice(afterPriceRaw) : '-';
+    const priceDiff = beforePriceRaw !== null && afterPriceRaw !== null
+      ? fmtPriceDelta(afterPriceRaw - beforePriceRaw)
+      : '-';
+    bestPrice.textContent = `${beforePriceValue}[${afterPriceValue}](${priceDiff})円`;
+  } else {
+    bestPrice.textContent = '-';
+  }
 
   const beforeRaw = bests.before ? bests.before.calc.beforeUnit : null;
   const afterRaw = bests.after ? bests.after.calc.afterUnit : null;
@@ -522,6 +572,102 @@ function formatHistoryDate(iso) {
   const h = String(d.getHours()).padStart(2, '0');
   const min = String(d.getMinutes()).padStart(2, '0');
   return `${y}/${m}/${day} ${h}:${min}`;
+}
+
+function setBulkMode(enabled) {
+  bulkMode = !!enabled;
+  if (!bulkMode) {
+    bulkSelected.clear();
+    $('bulkStoreName').value = '';
+    $('bulkMessage').textContent = '';
+  } else {
+    openProductId = null;
+  }
+
+  $('bulkStoreBar').classList.toggle('hidden', !bulkMode);
+  $('btnBulkStore').textContent = bulkMode ? '一括中' : '一括店舗';
+  updateBulkSelectedCount();
+  render();
+
+  if (bulkMode) {
+    requestAnimationFrame(() => $('bulkStoreName').focus());
+  }
+}
+
+function updateBulkSelectedCount() {
+  $('bulkSelectedCount').textContent = `${bulkSelected.size}件選択`;
+}
+
+function toggleBulkSelectAll() {
+  const q = $('searchInput').value.trim().toLowerCase();
+  const visible = products.filter(p =>
+    !q ||
+    p.name.toLowerCase().includes(q) ||
+    (p.reading || '').toLowerCase().includes(q)
+  );
+
+  const allSelected = visible.length > 0 && visible.every(p => bulkSelected.has(p.id));
+
+  visible.forEach(p => {
+    if (allSelected) bulkSelected.delete(p.id);
+    else bulkSelected.add(p.id);
+  });
+
+  updateBulkSelectedCount();
+  render();
+}
+
+function bulkAddStore() {
+  const storeName = $('bulkStoreName').value.trim();
+
+  if (!storeName) {
+    $('bulkMessage').textContent = '店舗名を入力してね。';
+    $('bulkStoreName').focus();
+    return;
+  }
+
+  if (bulkSelected.size === 0) {
+    $('bulkMessage').textContent = '商品を1つ以上選択してね。';
+    return;
+  }
+
+  let added = 0;
+  let skipped = 0;
+
+  products.forEach(product => {
+    if (!bulkSelected.has(product.id)) return;
+
+    const duplicate = product.stores.some(row =>
+      String(row.store || '').trim().toLowerCase() === storeName.toLowerCase()
+    );
+
+    if (duplicate) {
+      skipped += 1;
+      return;
+    }
+
+    product.stores.push({
+      id: makeId('s'),
+      store: storeName,
+      price: '',
+      priceType: settings.defaultPriceType,
+      tax: product.defaultTax,
+      couponType: 'none',
+      couponValue: ''
+    });
+
+    added += 1;
+  });
+
+  persistNow();
+
+  $('bulkMessage').textContent = skipped
+    ? `${added}商品に追加。${skipped}商品は同じ店舗があるのでスキップ。`
+    : `${added}商品に「${storeName}」を追加したよ。`;
+
+  bulkSelected.clear();
+  updateBulkSelectedCount();
+  render();
 }
 
 function normalizeReadingInput(value) {

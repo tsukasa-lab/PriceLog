@@ -9,16 +9,17 @@
   <title>PriceLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./style.css?v=0.12">
+  <link rel="stylesheet" href="./style.css?v=0.13">
 </head>
 <body>
   <header class="topbar">
     <div>
       <strong>PriceLog</strong>
-      <small>Ver.0.12</small>
+      <small>Ver.0.13</small>
     </div>
     <div class="top-actions">
       <button id="btnSettings" class="icon-btn" type="button" aria-label="設定">⚙</button>
+      <button id="btnBulkStore" class="ghost mini" type="button">一括店舗</button>
       <button id="btnAddProduct" class="primary mini" type="button">＋商品</button>
     </div>
   </header>
@@ -27,6 +28,20 @@
     <section class="searchbar">
       <input id="searchInput" type="search" placeholder="商品を検索" autocomplete="off">
       <span id="productCount" class="count"></span>
+    </section>
+
+    <section id="bulkStoreBar" class="bulk-store-bar hidden">
+      <div class="bulk-store-top">
+        <strong>選択した商品に店舗を一括追加</strong>
+        <span id="bulkSelectedCount">0件選択</span>
+      </div>
+      <div class="bulk-store-controls">
+        <input id="bulkStoreName" type="text" maxlength="40" placeholder="店舗名">
+        <button id="btnBulkSelectAll" class="ghost mini" type="button">全選択</button>
+        <button id="btnBulkAdd" class="primary mini" type="button">追加</button>
+        <button id="btnBulkCancel" class="ghost mini" type="button">終了</button>
+      </div>
+      <div id="bulkMessage" class="bulk-message"></div>
     </section>
 
     <section id="productList" class="product-list"></section>
@@ -154,17 +169,25 @@
 
   <template id="productTemplate">
     <article class="product-card">
-      <button class="product-summary" type="button">
-        <span class="summary-main">
-          <span class="product-name"></span>
-          <span class="product-size"></span>
-        </span>
-        <span class="best-wrap">
-          <span class="best-store"></span>
-          <strong class="best-unit"></strong>
-        </span>
-        <span class="chev">›</span>
-      </button>
+      <div class="product-summary-row">
+        <label class="bulk-check-wrap hidden">
+          <input class="bulk-check" type="checkbox" aria-label="一括店舗追加の対象に選択">
+        </label>
+        <button class="product-summary" type="button">
+          <span class="summary-main">
+            <span class="product-name"></span>
+            <span class="product-size"></span>
+          </span>
+          <span class="best-wrap">
+            <span class="best-store"></span>
+            <span class="best-values">
+              <span class="best-price"></span>
+              <strong class="best-unit"></strong>
+            </span>
+          </span>
+          <span class="chev">›</span>
+        </button>
+      </div>
 
       <div class="product-detail hidden">
         <div class="detail-toolbar">
@@ -207,6 +230,6 @@
     </div>
   </template>
 
-  <script src="./app.js?v=0.12"></script>
+  <script src="./app.js?v=0.13"></script>
 </body>
 </html>
