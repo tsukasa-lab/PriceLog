@@ -9,13 +9,13 @@
   <title>PriceLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./style.css?v=0.5">
+  <link rel="stylesheet" href="./style.css?v=0.8">
 </head>
 <body>
   <header class="topbar">
     <div>
       <strong>PriceLog</strong>
-      <small>Ver.0.5</small>
+      <small>Ver.0.8</small>
     </div>
     <div class="top-actions">
       <button id="btnSettings" class="icon-btn" type="button" aria-label="設定">⚙</button>
@@ -109,8 +109,8 @@
       <div class="settings-block">
         <div class="settings-title">データ</div>
         <div class="stack">
-          <button id="btnExport" class="ghost" type="button">バックアップを書き出す</button>
-          <label class="file-btn ghost">バックアップを読み込む
+          <button id="btnExport" class="ghost backup-btn" type="button">バックアップを書き出す</button>
+          <label class="file-btn ghost backup-btn">バックアップを読み込む
             <input id="importFile" type="file" accept="application/json,.json">
           </label>
         </div>
@@ -145,7 +145,7 @@
         <div class="store-scroll">
           <div class="store-table">
             <div class="store-head">
-              <span>店舗</span><span>価格</span><span>税込</span><span>税率</span><span>クーポン</span><span>値</span><span>単価</span><span></span>
+              <span>店舗</span><span>入力価格</span><span>税込</span><span>税率</span><span>クーポン</span><span>値</span><span>価格(クーポン適用)</span><span>単価(クーポン適用)</span><span></span>
             </div>
             <div class="store-list"></div>
           </div>
@@ -156,7 +156,7 @@
 
   <template id="storeTemplate">
     <div class="store-row">
-      <div class="store-name-cell"><span class="best-mark" aria-hidden="true">★</span><input class="st-store" type="text" maxlength="40" placeholder="店舗"></div>
+      <div class="store-name-cell"><span class="best-mark" aria-hidden="true"></span><input class="st-store" type="text" maxlength="40" placeholder="店舗"></div>
       <input class="st-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="価格">
       <select class="st-price-type" aria-label="税込・税抜">
         <option value="inc">込</option>
@@ -169,15 +169,12 @@
         <option value="yen">円引</option>
       </select>
       <input class="st-coupon-value" type="number" min="0" step="0.01" inputmode="decimal" placeholder="-">
+      <output class="st-price-result">-</output>
       <output class="st-unit">-</output>
       <button class="st-delete" type="button" aria-label="店舗行を削除">×</button>
-      <div class="store-sub">
-        <span class="st-total"></span>
-        <span class="st-before"></span>
-      </div>
     </div>
   </template>
 
-  <script src="./app.js?v=0.5"></script>
+  <script src="./app.js?v=0.8"></script>
 </body>
 </html>

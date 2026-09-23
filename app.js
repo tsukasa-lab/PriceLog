@@ -138,15 +138,17 @@ function render() {
     const node = productTemplate.content.firstElementChild.cloneNode(true);
     node.dataset.id = product.id;
 
-    const best = getBest(product);
+    const bests = getBests(product);
     node.querySelector('.product-name').textContent = product.name;
     node.querySelector('.product-size').textContent = `${fmt(product.amount)}${product.unit}`;
 
     const bestStore = node.querySelector('.best-store');
     const bestUnit = node.querySelector('.best-unit');
-    if (best) {
-      bestStore.textContent = `★${best.store || '店舗未入力'}`;
-      bestUnit.textContent = `${fmtUnit(best.calc.afterUnit)}円/${product.unit}`;
+    if (bests.before || bests.after) {
+      bestStore.textContent = formatBestStores(bests);
+      const beforeValue = bests.before ? fmtUnit(bests.before.calc.beforeUnit) : '-';
+      const afterValue = bests.after ? fmtUnit(bests.after.calc.afterUnit) : '-';
+      bestUnit.textContent = `${beforeValue}(${afterValue})円/${product.unit}`;
       node.classList.add('has-best');
     } else {
       bestStore.textContent = '価格未登録';
@@ -186,10 +188,13 @@ function render() {
       });
 
       const storeList = node.querySelector('.store-list');
-      const bestId = best?.row.id || null;
 
       product.stores.forEach(row => {
-        storeList.appendChild(renderStoreRow(product, row, row.id === bestId));
+        const flags = {
+          before: bests.before?.row.id === row.id,
+          after: bests.after?.row.id === row.id
+        };
+        storeList.appendChild(renderStoreRow(product, row, flags));
       });
 
       if (!product.stores.length) {
@@ -204,9 +209,10 @@ function render() {
   });
 }
 
-function renderStoreRow(product, row, isBest) {
+function renderStoreRow(product, row, bestFlags = {before:false, after:false}) {
   const el = storeTemplate.content.firstElementChild.cloneNode(true);
-  if (isBest) el.classList.add('best');
+  const bestMark = el.querySelector('.best-mark');
+  applyBestFlags(el, bestMark, bestFlags);
 
   const store = el.querySelector('.st-store');
   const price = el.querySelector('.st-price');
@@ -214,9 +220,8 @@ function renderStoreRow(product, row, isBest) {
   const tax = el.querySelector('.st-tax');
   const couponType = el.querySelector('.st-coupon-type');
   const couponValue = el.querySelector('.st-coupon-value');
+  const priceResultOut = el.querySelector('.st-price-result');
   const unitOut = el.querySelector('.st-unit');
-  const totalOut = el.querySelector('.st-total');
-  const beforeOut = el.querySelector('.st-before');
 
   store.value = row.store ?? '';
   price.value = row.price ?? '';
@@ -238,18 +243,11 @@ function renderStoreRow(product, row, isBest) {
 
     const calc = calcRow(product, row);
     if (calc) {
-      unitOut.textContent = `${fmtUnit(calc.afterUnit)}`;
-      if (Math.abs(calc.grossBefore - calc.afterTotal) > 0.0001) {
-        totalOut.textContent = `通常 ${fmtYen(calc.grossBefore)} → 適用後 ${fmtYen(calc.afterTotal)}`;
-        beforeOut.textContent = `${fmtUnit(calc.beforeUnit)}→${fmtUnit(calc.afterUnit)}円/${product.unit}`;
-      } else {
-        totalOut.textContent = `価格 ${fmtYen(calc.grossBefore)}`;
-        beforeOut.textContent = `${fmtUnit(calc.beforeUnit)}円/${product.unit}`;
-      }
+      priceResultOut.textContent = `${fmtPrice(calc.grossBefore)}(${fmtPrice(calc.afterTotal)})`;
+      unitOut.textContent = `${fmtUnit(calc.beforeUnit)}(${fmtUnit(calc.afterUnit)})`;
     } else {
+      priceResultOut.textContent = '-';
       unitOut.textContent = '-';
-      totalOut.textContent = '';
-      beforeOut.textContent = '';
     }
 
     persistSoon();
@@ -276,26 +274,44 @@ function refreshBestOnly(productId) {
   const card = listEl.querySelector(`[data-id="${cssEscape(productId)}"]`);
   if (!product || !card) return;
 
-  const best = getBest(product);
-  card.querySelector('.best-store').textContent = best ? `★${best.store || '店舗未入力'}` : '価格未登録';
-  card.querySelector('.best-unit').textContent = best ? `${fmtUnit(best.calc.afterUnit)}円/${product.unit}` : '-';
-  card.classList.toggle('has-best', !!best);
+  const bests = getBests(product);
+  const hasBest = !!(bests.before || bests.after);
+
+  card.querySelector('.best-store').textContent = hasBest ? formatBestStores(bests) : '価格未登録';
+
+  const beforeValue = bests.before ? fmtUnit(bests.before.calc.beforeUnit) : '-';
+  const afterValue = bests.after ? fmtUnit(bests.after.calc.afterUnit) : '-';
+  card.querySelector('.best-unit').textContent = hasBest
+    ? `${beforeValue}(${afterValue})円/${product.unit}`
+    : '-';
+
+  card.classList.toggle('has-best', hasBest);
 
   const rowEls = card.querySelectorAll('.store-row');
-  rowEls.forEach((r, i) => {
-    r.classList.remove('best');
-    const out = r.querySelector('.st-unit');
+  rowEls.forEach((rowEl, i) => {
     const row = product.stores[i];
     const calc = row ? calcRow(product, row) : null;
-    if (out) out.textContent = calc ? fmtUnit(calc.afterUnit) : '-';
+    const priceResultOut = rowEl.querySelector('.st-price-result');
+    const unitOut = rowEl.querySelector('.st-unit');
+    const mark = rowEl.querySelector('.best-mark');
+
+    if (priceResultOut) {
+      priceResultOut.textContent = calc
+        ? `${fmtPrice(calc.grossBefore)}(${fmtPrice(calc.afterTotal)})`
+        : '-';
+    }
+
+    if (unitOut) {
+      unitOut.textContent = calc
+        ? `${fmtUnit(calc.beforeUnit)}(${fmtUnit(calc.afterUnit)})`
+        : '-';
+    }
+
+    applyBestFlags(rowEl, mark, {
+      before: !!bests.before && bests.before.row.id === row?.id,
+      after: !!bests.after && bests.after.row.id === row?.id
+    });
   });
-  if (best && openProductId === productId) {
-    const index = product.stores.findIndex(s => s.id === best.row.id);
-    const bestEl = rowEls[index];
-    bestEl?.classList.add('best');
-    const out = bestEl?.querySelector('.st-unit');
-    if (out) out.textContent = `${fmtUnit(best.calc.afterUnit)}`;
-  }
 }
 
 function calcRow(product, row) {
@@ -325,16 +341,49 @@ function calcRow(product, row) {
   };
 }
 
-function getBest(product) {
-  let best = null;
+function getBests(product) {
+  let before = null;
+  let after = null;
+
   product.stores.forEach(row => {
     const calc = calcRow(product, row);
     if (!calc) return;
-    if (!best || calc.afterUnit < best.calc.afterUnit) {
-      best = { row, store: row.store, calc };
+
+    if (!before || calc.beforeUnit < before.calc.beforeUnit) {
+      before = { row, store: row.store, calc };
+    }
+
+    if (!after || calc.afterUnit < after.calc.afterUnit) {
+      after = { row, store: row.store, calc };
     }
   });
-  return best;
+
+  return { before, after };
+}
+
+function formatBestStores(bests) {
+  if (!bests.before && !bests.after) return '価格未登録';
+
+  const beforeId = bests.before?.row.id;
+  const afterId = bests.after?.row.id;
+
+  if (beforeId && afterId && beforeId === afterId) {
+    return `★◆${bests.before.store || '店舗未入力'}`;
+  }
+
+  const parts = [];
+  if (bests.before) parts.push(`★${bests.before.store || '店舗未入力'}`);
+  if (bests.after) parts.push(`◆${bests.after.store || '店舗未入力'}`);
+  return parts.join('　');
+}
+
+function applyBestFlags(rowEl, markEl, flags) {
+  rowEl.classList.toggle('best-before', !!flags.before);
+  rowEl.classList.toggle('best-after', !!flags.after);
+
+  const mark = `${flags.before ? '★' : ''}${flags.after ? '◆' : ''}`;
+  if (markEl) markEl.textContent = mark;
+  rowEl.classList.toggle('has-best-mark', !!mark);
 }
 
 function openProductDialog(id = null) {
@@ -462,6 +511,10 @@ function fmt(v) {
 
 function fmtUnit(v) {
   return Number(v).toLocaleString('ja-JP', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtPrice(v) {
+  return Number(v).toLocaleString('ja-JP', {maximumFractionDigits:1});
 }
 
 function fmtYen(v) {
