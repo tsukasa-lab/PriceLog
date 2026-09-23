@@ -145,7 +145,7 @@ function render() {
     const bestStore = node.querySelector('.best-store');
     const bestUnit = node.querySelector('.best-unit');
     if (best) {
-      bestStore.textContent = best.store || '店舗未入力';
+      bestStore.textContent = `★${best.store || '店舗未入力'}`;
       bestUnit.textContent = `${fmtUnit(best.calc.afterUnit)}円/${product.unit}`;
       node.classList.add('has-best');
     } else {
@@ -239,8 +239,13 @@ function renderStoreRow(product, row, isBest) {
     const calc = calcRow(product, row);
     if (calc) {
       unitOut.textContent = `${fmtUnit(calc.afterUnit)}`;
-      totalOut.textContent = `支払 ${fmtYen(calc.afterTotal)}`;
-      beforeOut.textContent = calc.beforeUnit !== calc.afterUnit ? `通常 ${fmtUnit(calc.beforeUnit)}/${product.unit}` : '';
+      if (Math.abs(calc.grossBefore - calc.afterTotal) > 0.0001) {
+        totalOut.textContent = `通常 ${fmtYen(calc.grossBefore)} → 適用後 ${fmtYen(calc.afterTotal)}`;
+        beforeOut.textContent = `${fmtUnit(calc.beforeUnit)}→${fmtUnit(calc.afterUnit)}円/${product.unit}`;
+      } else {
+        totalOut.textContent = `価格 ${fmtYen(calc.grossBefore)}`;
+        beforeOut.textContent = `${fmtUnit(calc.beforeUnit)}円/${product.unit}`;
+      }
     } else {
       unitOut.textContent = '-';
       totalOut.textContent = '';
@@ -272,14 +277,24 @@ function refreshBestOnly(productId) {
   if (!product || !card) return;
 
   const best = getBest(product);
-  card.querySelector('.best-store').textContent = best ? (best.store || '店舗未入力') : '価格未登録';
+  card.querySelector('.best-store').textContent = best ? `★${best.store || '店舗未入力'}` : '価格未登録';
   card.querySelector('.best-unit').textContent = best ? `${fmtUnit(best.calc.afterUnit)}円/${product.unit}` : '-';
   card.classList.toggle('has-best', !!best);
 
-  card.querySelectorAll('.store-row').forEach(r => r.classList.remove('best'));
+  const rowEls = card.querySelectorAll('.store-row');
+  rowEls.forEach((r, i) => {
+    r.classList.remove('best');
+    const out = r.querySelector('.st-unit');
+    const row = product.stores[i];
+    const calc = row ? calcRow(product, row) : null;
+    if (out) out.textContent = calc ? fmtUnit(calc.afterUnit) : '-';
+  });
   if (best && openProductId === productId) {
     const index = product.stores.findIndex(s => s.id === best.row.id);
-    card.querySelectorAll('.store-row')[index]?.classList.add('best');
+    const bestEl = rowEls[index];
+    bestEl?.classList.add('best');
+    const out = bestEl?.querySelector('.st-unit');
+    if (out) out.textContent = `${fmtUnit(best.calc.afterUnit)}`;
   }
 }
 
