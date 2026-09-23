@@ -203,26 +203,16 @@ function render() {
     const bestStore = node.querySelector('.best-store');
     const bestPrice = node.querySelector('.best-price');
     const bestUnit = node.querySelector('.best-unit');
-    if (bests.before || bests.after) {
+    if (bests.before) {
       bestStore.textContent = formatBestStores(bests);
 
-      const beforePriceRaw = bests.before ? bests.before.calc.grossBefore : null;
-      const afterPriceRaw = bests.after ? bests.after.calc.afterTotal : null;
-      const beforePriceValue = beforePriceRaw !== null ? fmtPrice(beforePriceRaw) : '-';
-      const afterPriceValue = afterPriceRaw !== null ? fmtPrice(afterPriceRaw) : '-';
-      const priceDiff = beforePriceRaw !== null && afterPriceRaw !== null
-        ? fmtPriceDelta(afterPriceRaw - beforePriceRaw)
-        : '-';
-      bestPrice.textContent = `${beforePriceValue}[${afterPriceValue}](${priceDiff})円`;
+      const baseCalc = bests.before.calc;
+      bestPrice.textContent =
+        `${fmtPrice(baseCalc.grossBefore)}[${fmtPrice(baseCalc.afterTotal)}](${fmtPriceDelta(baseCalc.afterTotal - baseCalc.grossBefore)})円`;
 
-      const beforeRaw = bests.before ? bests.before.calc.beforeUnit : null;
-      const afterRaw = bests.after ? bests.after.calc.afterUnit : null;
-      const beforeValue = beforeRaw !== null ? fmtUnit(beforeRaw) : '-';
-      const afterValue = afterRaw !== null ? fmtUnit(afterRaw) : '-';
-      const summaryDiff = beforeRaw !== null && afterRaw !== null
-        ? fmtUnitDelta(afterRaw - beforeRaw)
-        : '-';
-      bestUnit.textContent = `${beforeValue}[${afterValue}](${summaryDiff})円/${product.unit}`;
+      bestUnit.textContent =
+        `${fmtUnit(baseCalc.beforeUnit)}[${fmtUnit(baseCalc.afterUnit)}](${fmtUnitDelta(baseCalc.afterUnit - baseCalc.beforeUnit)})円/${product.unit}`;
+
       node.classList.add('has-best');
     } else {
       bestStore.textContent = '価格未登録';
@@ -382,34 +372,25 @@ function refreshBestOnly(productId) {
   if (!product || !card) return;
 
   const bests = getBests(product);
-  const hasBest = !!(bests.before || bests.after);
+  const hasBest = !!bests.before;
 
   card.querySelector('.best-store').textContent = hasBest ? formatBestStores(bests) : '価格未登録';
 
   const bestPrice = card.querySelector('.best-price');
+  const bestUnit = card.querySelector('.best-unit');
+
   if (hasBest) {
-    const beforePriceRaw = bests.before ? bests.before.calc.grossBefore : null;
-    const afterPriceRaw = bests.after ? bests.after.calc.afterTotal : null;
-    const beforePriceValue = beforePriceRaw !== null ? fmtPrice(beforePriceRaw) : '-';
-    const afterPriceValue = afterPriceRaw !== null ? fmtPrice(afterPriceRaw) : '-';
-    const priceDiff = beforePriceRaw !== null && afterPriceRaw !== null
-      ? fmtPriceDelta(afterPriceRaw - beforePriceRaw)
-      : '-';
-    bestPrice.textContent = `${beforePriceValue}[${afterPriceValue}](${priceDiff})円`;
+    const baseCalc = bests.before.calc;
+
+    bestPrice.textContent =
+      `${fmtPrice(baseCalc.grossBefore)}[${fmtPrice(baseCalc.afterTotal)}](${fmtPriceDelta(baseCalc.afterTotal - baseCalc.grossBefore)})円`;
+
+    bestUnit.textContent =
+      `${fmtUnit(baseCalc.beforeUnit)}[${fmtUnit(baseCalc.afterUnit)}](${fmtUnitDelta(baseCalc.afterUnit - baseCalc.beforeUnit)})円/${product.unit}`;
   } else {
     bestPrice.textContent = '-';
+    bestUnit.textContent = '-';
   }
-
-  const beforeRaw = bests.before ? bests.before.calc.beforeUnit : null;
-  const afterRaw = bests.after ? bests.after.calc.afterUnit : null;
-  const beforeValue = beforeRaw !== null ? fmtUnit(beforeRaw) : '-';
-  const afterValue = afterRaw !== null ? fmtUnit(afterRaw) : '-';
-  const summaryDiff = beforeRaw !== null && afterRaw !== null
-    ? fmtUnitDelta(afterRaw - beforeRaw)
-    : '-';
-  card.querySelector('.best-unit').textContent = hasBest
-    ? `${beforeValue}[${afterValue}](${summaryDiff})円/${product.unit}`
-    : '-';
 
   card.classList.toggle('has-best', hasBest);
 
@@ -469,8 +450,8 @@ function calcRow(product, row) {
 
 function getBests(product) {
   let before = null;
-  let after = null;
 
+  // ★ = クーポンを使わない通常時の最安店舗
   product.stores.forEach(row => {
     const calc = calcRow(product, row);
     if (!calc) return;
@@ -478,6 +459,24 @@ function getBests(product) {
     if (!before || calc.beforeUnit < before.calc.beforeUnit) {
       before = { row, store: row.store, calc };
     }
+  });
+
+  if (!before) return { before: null, after: null };
+
+  // ◆ = ★とは別店舗で、クーポン使用後価格が
+  // ★店舗の通常価格・クーポン適用後価格の両方より安い場合だけ表示。
+  let after = null;
+
+  product.stores.forEach(row => {
+    if (row.id === before.row.id) return;
+
+    const calc = calcRow(product, row);
+    if (!calc) return;
+
+    const beatsBaseBefore = calc.afterUnit < before.calc.beforeUnit;
+    const beatsBaseAfter = calc.afterUnit < before.calc.afterUnit;
+
+    if (!beatsBaseBefore || !beatsBaseAfter) return;
 
     if (!after || calc.afterUnit < after.calc.afterUnit) {
       after = { row, store: row.store, calc };
@@ -488,23 +487,19 @@ function getBests(product) {
 }
 
 function formatBestStores(bests) {
-  if (!bests.before && !bests.after) return '価格未登録';
+  if (!bests.before) return '価格未登録';
 
-  const beforeId = bests.before?.row.id;
-  const afterId = bests.after?.row.id;
+  const parts = [`★${bests.before.store || '店舗未入力'}`];
 
-  if (beforeId && afterId && beforeId === afterId) {
-    return `★◆${bests.before.store || '店舗未入力'}`;
+  if (bests.after) {
+    parts.push(`◆${bests.after.store || '店舗未入力'}`);
   }
 
-  const parts = [];
-  if (bests.before) parts.push(`★${bests.before.store || '店舗未入力'}`);
-  if (bests.after) parts.push(`◆${bests.after.store || '店舗未入力'}`);
   return parts.join('　');
 }
 
 function applyBestFlags(rowEl, markEl, flags) {
-  const mark = `${flags.before ? '★' : ''}${flags.after ? '◆' : ''}`;
+  const mark = flags.before ? '★' : (flags.after ? '◆' : '');
   if (markEl) markEl.textContent = mark;
 }
 

@@ -9,13 +9,13 @@
   <title>PriceLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./style.css?v=0.15">
+  <link rel="stylesheet" href="./style.css?v=0.16">
 </head>
 <body>
   <header class="topbar">
     <div>
       <strong>PriceLog</strong>
-      <small>Ver.0.15</small>
+      <small>Ver.0.16</small>
     </div>
     <div class="top-actions">
       <button id="btnSettings" class="icon-btn" type="button" aria-label="設定">⚙</button>
@@ -26,8 +26,8 @@
 
   <main>
     <div class="best-legend">
-      <span><strong>★</strong> 通常最安</span>
-      <span><strong>◆</strong> クーポン適用後最安</span>
+      <span><strong>★</strong> 通常時に買う店</span>
+      <span><strong>◆</strong> クーポン使用で★より安い店</span>
     </div>
 
     <section class="searchbar">
@@ -194,11 +194,11 @@
             <span class="best-store"></span>
             <span class="best-values">
               <span class="best-metric">
-                <span class="metric-mark">★◆</span>
+                <span class="metric-mark">★</span>
                 <span class="best-price"></span>
               </span>
               <span class="best-metric">
-                <span class="metric-mark">★◆</span>
+                <span class="metric-mark">★</span>
                 <strong class="best-unit"></strong>
               </span>
             </span>
@@ -248,6 +248,6 @@
     </div>
   </template>
 
-  <script src="./app.js?v=0.15"></script>
+  <script src="./app.js?v=0.16"></script>
 </body>
 </html>
