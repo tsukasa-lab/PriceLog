@@ -4,6 +4,7 @@
 const STORAGE_KEY = 'pricelog_v02_data';
 const SETTINGS_KEY = 'pricelog_v02_settings';
 const INITIALIZED_KEY = 'pricelog_initialized_v1';
+const TEMPLATE_KEY = 'pricelog_custom_template_v1';
 
 const defaultSettings = {
   standardTax: 10,
@@ -20,6 +21,8 @@ let bulkMode = false;
 let bulkSelected = new Set();
 let storePurchaseMode = false;
 let openStoreName = null;
+let customTemplate = normalizeTemplateData(loadJson(TEMPLATE_KEY, {version:1, products:[], stores:[]}));
+let templateDraft = null;
 
 const $ = (id) => document.getElementById(id);
 const listEl = $('productList');
@@ -35,7 +38,18 @@ $('btnBulkStore').addEventListener('click', () => setBulkMode(!bulkMode));
 $('btnBulkCancel').addEventListener('click', () => setBulkMode(false));
 $('btnBulkSelectAll').addEventListener('click', toggleBulkSelectAll);
 $('btnBulkAdd').addEventListener('click', bulkAddStore);
+$('btnEditTemplate').addEventListener('click', openTemplateEditor);
 $('btnLoadTemplate').addEventListener('click', loadProductTemplate);
+$('btnCloseTemplate').addEventListener('click', () => $('templateDialog').close());
+$('btnAddTemplateProduct').addEventListener('click', addTemplateProduct);
+$('btnAddTemplateStore').addEventListener('click', addTemplateStore);
+$('btnTemplateProductsAll').addEventListener('click', () => setTemplateSelection('products', true));
+$('btnTemplateProductsNone').addEventListener('click', () => setTemplateSelection('products', false));
+$('btnTemplateStoresAll').addEventListener('click', () => setTemplateSelection('stores', true));
+$('btnTemplateStoresNone').addEventListener('click', () => setTemplateSelection('stores', false));
+$('btnImportRecommendedProducts').addEventListener('click', importRecommendedProductsToDraft);
+$('btnSaveTemplate').addEventListener('click', saveTemplateDraft);
+$('btnExportTemplateFile').addEventListener('click', exportTemplateFile);
 $('btnStorePurchase').addEventListener('click', () => setStorePurchaseMode(!storePurchaseMode));
 $('btnCloseStorePurchase').addEventListener('click', () => setStorePurchaseMode(false));
 $('storePurchaseSearch').addEventListener('input', renderStorePurchaseView);
@@ -873,57 +887,450 @@ function bulkAddStore() {
   render();
 }
 
-async function loadProductTemplate() {
-  const btn = $('btnLoadTemplate');
-  const msg = $('templateMessage');
+function normalizeTemplateData(data) {
+  const result = { version: 1, products: [], stores: [] };
 
-  btn.disabled = true;
-  msg.textContent = 'テンプレートを読み込み中…';
-
-  try {
-    const response = await fetch('./template-products.json?v=1', { cache: 'no-store' });
-    if (!response.ok) throw new Error('template fetch failed');
-
-    const data = await response.json();
-    if (!Array.isArray(data.products)) throw new Error('invalid template');
-
-    const existingKeys = new Set(products.map(productTemplateKey));
-    let added = 0;
-
-    data.products.forEach(item => {
-      const candidate = {
-        id: makeId('p'),
+  if (data && Array.isArray(data.products)) {
+    result.products = data.products
+      .map(item => ({
+        id: String(item.id || makeId('tp')),
+        selected: item.selected !== false,
         name: String(item.name || '').trim(),
         reading: normalizeReadingInput(item.reading || ''),
         amount: Number(item.amount),
         unit: String(item.unit || '').trim(),
-        defaultTax: Number(item.defaultTax),
-        history: [],
-        stores: []
+        defaultTax: Number.isFinite(Number(item.defaultTax)) ? Number(item.defaultTax) : settings.reducedTax
+      }))
+      .filter(item => item.name && item.amount > 0 && item.unit);
+  }
+
+  if (data && Array.isArray(data.stores)) {
+    result.stores = data.stores
+      .map(item => ({
+        id: String(item.id || makeId('ts')),
+        selected: item.selected !== false,
+        name: String(item.name || '').trim()
+      }))
+      .filter(item => item.name);
+  }
+
+  return result;
+}
+
+function cloneTemplate(data) {
+  return JSON.parse(JSON.stringify(normalizeTemplateData(data)));
+}
+
+function persistTemplateNow() {
+  customTemplate = normalizeTemplateData(customTemplate);
+  localStorage.setItem(TEMPLATE_KEY, JSON.stringify(customTemplate));
+  updateTemplateSummary();
+}
+
+function selectedTemplateProducts(data = customTemplate) {
+  return normalizeTemplateData(data).products.filter(item => item.selected);
+}
+
+function selectedTemplateStores(data = customTemplate) {
+  return normalizeTemplateData(data).stores.filter(item => item.selected);
+}
+
+function updateTemplateSummary() {
+  const el = $('templateSummary');
+  if (!el) return;
+
+  const productsCount = selectedTemplateProducts().length;
+  const storesCount = selectedTemplateStores().length;
+  const allProducts = customTemplate.products.length;
+  const allStores = customTemplate.stores.length;
+
+  el.textContent =
+    `商品 ${productsCount}/${allProducts}件選択　店舗 ${storesCount}/${allStores}件選択`;
+}
+
+function refreshTemplateTaxOptions() {
+  const select = $('tplProductTax');
+  if (!select) return;
+
+  const current = select.value;
+  const values = Array.from(new Set([Number(settings.reducedTax), Number(settings.standardTax)]))
+    .filter(v => Number.isFinite(v) && v >= 0);
+
+  select.innerHTML = '';
+  values.forEach(v => {
+    const option = document.createElement('option');
+    option.value = String(v);
+    option.textContent = `${v}%`;
+    select.appendChild(option);
+  });
+
+  select.value = values.includes(Number(current))
+    ? String(current)
+    : String(settings.reducedTax);
+}
+
+function openTemplateEditor() {
+  templateDraft = cloneTemplate(customTemplate);
+  refreshTemplateTaxOptions();
+  $('templateEditorMessage').textContent = '';
+  renderTemplateEditor();
+  $('templateDialog').showModal();
+}
+
+function renderTemplateEditor() {
+  if (!templateDraft) return;
+
+  const productList = $('templateProductList');
+  const storeList = $('templateStoreList');
+
+  productList.innerHTML = '';
+  storeList.innerHTML = '';
+
+  const sortedProducts = templateDraft.products
+    .slice()
+    .sort((a, b) => compareProducts(a, b));
+
+  sortedProducts.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'template-entry-row template-product-row';
+
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.className = 'template-entry-check';
+    check.checked = !!item.selected;
+    check.addEventListener('change', () => {
+      item.selected = check.checked;
+    });
+
+    const name = document.createElement('span');
+    name.className = 'template-entry-name';
+    name.textContent = item.name;
+
+    const reading = document.createElement('span');
+    reading.className = 'template-entry-reading';
+    reading.textContent = item.reading || '-';
+
+    const amount = document.createElement('span');
+    amount.className = 'template-entry-meta';
+    amount.textContent = `${fmt(item.amount)}${item.unit}`;
+
+    const tax = document.createElement('span');
+    tax.className = 'template-entry-meta';
+    tax.textContent = `${item.defaultTax}%`;
+
+    const type = document.createElement('span');
+    type.className = 'template-entry-meta';
+    type.textContent = '商品';
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'template-entry-delete';
+    del.textContent = '×';
+    del.setAttribute('aria-label', `${item.name}を削除`);
+    del.addEventListener('click', () => {
+      templateDraft.products = templateDraft.products.filter(x => x.id !== item.id);
+      renderTemplateEditor();
+    });
+
+    row.append(check, name, reading, amount, tax, type, del);
+    productList.appendChild(row);
+  });
+
+  templateDraft.stores
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, 'ja', {sensitivity:'base', numeric:true}))
+    .forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'template-entry-row template-store-row';
+
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.className = 'template-entry-check';
+      check.checked = !!item.selected;
+      check.addEventListener('change', () => {
+        item.selected = check.checked;
+      });
+
+      const name = document.createElement('span');
+      name.className = 'template-entry-name';
+      name.textContent = item.name;
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'template-entry-delete';
+      del.textContent = '×';
+      del.setAttribute('aria-label', `${item.name}を削除`);
+      del.addEventListener('click', () => {
+        templateDraft.stores = templateDraft.stores.filter(x => x.id !== item.id);
+        renderTemplateEditor();
+      });
+
+      row.append(check, name, del);
+      storeList.appendChild(row);
+    });
+
+  $('templateProductEmpty').classList.toggle('hidden', templateDraft.products.length !== 0);
+  $('templateStoreEmpty').classList.toggle('hidden', templateDraft.stores.length !== 0);
+}
+
+function addTemplateProduct() {
+  if (!templateDraft) return;
+
+  const name = $('tplProductName').value.trim();
+  const reading = normalizeReadingInput($('tplProductReading').value);
+  const amount = Number($('tplProductAmount').value);
+  const unit = $('tplProductUnit').value;
+  const tax = Number($('tplProductTax').value);
+
+  if (!name || !(amount > 0) || !unit) {
+    $('templateEditorMessage').textContent = '商品名・内容量・単位を確認してね。';
+    return;
+  }
+
+  const candidate = {
+    id: makeId('tp'),
+    selected: true,
+    name,
+    reading,
+    amount,
+    unit,
+    defaultTax: Number.isFinite(tax) ? tax : settings.reducedTax
+  };
+
+  const key = productTemplateKey(candidate);
+  const duplicate = templateDraft.products.some(item => productTemplateKey(item) === key);
+
+  if (duplicate) {
+    $('templateEditorMessage').textContent = '同じ商品はすでにテンプレートにあるよ。';
+    return;
+  }
+
+  templateDraft.products.push(candidate);
+
+  $('tplProductName').value = '';
+  $('tplProductReading').value = '';
+  $('templateEditorMessage').textContent = `${name}を追加したよ。`;
+  renderTemplateEditor();
+  $('tplProductName').focus();
+}
+
+function addTemplateStore() {
+  if (!templateDraft) return;
+
+  const name = $('tplStoreName').value.trim();
+  if (!name) {
+    $('templateEditorMessage').textContent = '店舗名を入力してね。';
+    return;
+  }
+
+  const duplicate = templateDraft.stores.some(item =>
+    item.name.trim().toLowerCase() === name.toLowerCase()
+  );
+
+  if (duplicate) {
+    $('templateEditorMessage').textContent = '同じ店舗はすでにテンプレートにあるよ。';
+    return;
+  }
+
+  templateDraft.stores.push({
+    id: makeId('ts'),
+    selected: true,
+    name
+  });
+
+  $('tplStoreName').value = '';
+  $('templateEditorMessage').textContent = `${name}を追加したよ。`;
+  renderTemplateEditor();
+  $('tplStoreName').focus();
+}
+
+function setTemplateSelection(type, selected) {
+  if (!templateDraft || !Array.isArray(templateDraft[type])) return;
+  templateDraft[type].forEach(item => item.selected = !!selected);
+  renderTemplateEditor();
+}
+
+async function importRecommendedProductsToDraft() {
+  if (!templateDraft) return;
+
+  const btn = $('btnImportRecommendedProducts');
+  btn.disabled = true;
+  $('templateEditorMessage').textContent = 'おすすめ商品を読み込み中…';
+
+  try {
+    const response = await fetch('./template-products.json?v=1', { cache: 'no-store' });
+    if (!response.ok) throw new Error('recommended template fetch failed');
+
+    const data = await response.json();
+    if (!Array.isArray(data.products)) throw new Error('invalid recommended template');
+
+    const keys = new Set(templateDraft.products.map(productTemplateKey));
+    let added = 0;
+
+    data.products.forEach(item => {
+      const candidate = {
+        id: makeId('tp'),
+        selected: true,
+        name: String(item.name || '').trim(),
+        reading: normalizeReadingInput(item.reading || ''),
+        amount: Number(item.amount),
+        unit: String(item.unit || '').trim(),
+        defaultTax: Number.isFinite(Number(item.defaultTax))
+          ? Number(item.defaultTax)
+          : settings.reducedTax
       };
 
       if (!candidate.name || !(candidate.amount > 0) || !candidate.unit) return;
 
       const key = productTemplateKey(candidate);
-      if (existingKeys.has(key)) return;
+      if (keys.has(key)) return;
 
-      products.push(candidate);
-      existingKeys.add(key);
+      templateDraft.products.push(candidate);
+      keys.add(key);
       added += 1;
     });
 
-    persistNow();
-    render();
+    $('templateEditorMessage').textContent =
+      added ? `おすすめ商品を${added}件追加したよ。` : '追加できるおすすめ商品はなかったよ。';
 
-    msg.textContent = added > 0
-      ? `${added}商品を追加したよ。既存の商品はそのまま。`
-      : '追加できる商品はなかったよ。既存データは変更していない。';
-  } catch (err) {
-    msg.textContent = 'テンプレートを読み込めなかったよ。ファイルがアップロードされているか確認してね。';
+    renderTemplateEditor();
+  } catch {
+    $('templateEditorMessage').textContent = 'おすすめ商品を読み込めなかったよ。';
   } finally {
     btn.disabled = false;
   }
 }
+
+function saveTemplateDraft() {
+  if (!templateDraft) return;
+
+  customTemplate = normalizeTemplateData(templateDraft);
+  persistTemplateNow();
+
+  const p = selectedTemplateProducts().length;
+  const st = selectedTemplateStores().length;
+
+  $('templateEditorMessage').textContent =
+    `テンプレートを保存したよ。商品${p}件、店舗${st}件が読み込み対象。`;
+
+  updateTemplateSummary();
+}
+
+function getSelectedTemplatePayload(source = customTemplate) {
+  const normalized = normalizeTemplateData(source);
+
+  return {
+    app: 'PriceLog',
+    type: 'custom-template',
+    version: 1,
+    createdAt: new Date().toISOString(),
+    products: normalized.products
+      .filter(item => item.selected)
+      .map(item => ({
+        name: item.name,
+        reading: item.reading,
+        amount: item.amount,
+        unit: item.unit,
+        defaultTax: item.defaultTax
+      })),
+    stores: normalized.stores
+      .filter(item => item.selected)
+      .map(item => ({ name: item.name }))
+  };
+}
+
+function exportTemplateFile() {
+  if (!templateDraft) return;
+
+  const selectedProducts = templateDraft.products.filter(item => item.selected);
+  const selectedStores = templateDraft.stores.filter(item => item.selected);
+
+  if (!selectedProducts.length) {
+    $('templateEditorMessage').textContent = '商品を1つ以上チェックしてね。';
+    return;
+  }
+
+  const payload = getSelectedTemplatePayload(templateDraft);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `PriceLog-template-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  $('templateEditorMessage').textContent =
+    `商品${selectedProducts.length}件・店舗${selectedStores.length}件のテンプレートJSONを書き出したよ。`;
+}
+
+function loadProductTemplate() {
+  const msg = $('templateMessage');
+  const templateProducts = selectedTemplateProducts();
+  const templateStores = selectedTemplateStores();
+
+  if (!templateProducts.length) {
+    msg.textContent = 'テンプレートの商品を1つ以上選択してね。';
+    return;
+  }
+
+  const productByKey = new Map(products.map(product => [productTemplateKey(product), product]));
+  let addedProducts = 0;
+  let addedStoreRows = 0;
+
+  templateProducts.forEach(item => {
+    const key = productTemplateKey(item);
+    let product = productByKey.get(key);
+
+    if (!product) {
+      product = {
+        id: makeId('p'),
+        name: item.name,
+        reading: item.reading,
+        amount: item.amount,
+        unit: item.unit,
+        defaultTax: item.defaultTax,
+        history: [],
+        stores: []
+      };
+
+      products.push(product);
+      productByKey.set(key, product);
+      addedProducts += 1;
+    }
+
+    templateStores.forEach(storeItem => {
+      const storeName = storeItem.name.trim();
+      if (!storeName) return;
+
+      const exists = product.stores.some(row =>
+        String(row.store || '').trim().toLowerCase() === storeName.toLowerCase()
+      );
+
+      if (exists) return;
+
+      product.stores.push({
+        id: makeId('s'),
+        store: storeName,
+        price: '',
+        priceType: settings.defaultPriceType,
+        tax: product.defaultTax,
+        couponType: 'none',
+        couponValue: ''
+      });
+
+      addedStoreRows += 1;
+    });
+  });
+
+  persistNow();
+  render();
+
+  msg.textContent =
+    `商品${addedProducts}件、店舗行${addedStoreRows}件を差分追加したよ。既存データはそのまま。`;
+}
+
 
 function productTemplateKey(product) {
   const name = katakanaToHiragana(String(product.name || ''))
@@ -1082,6 +1489,8 @@ function openSettings() {
   $('standardTax').value = settings.standardTax;
   $('reducedTax').value = settings.reducedTax;
   $('defaultPriceType').value = settings.defaultPriceType;
+  updateTemplateSummary();
+  $('templateMessage').textContent = '';
   $('settingsDialog').showModal();
 }
 
@@ -1091,7 +1500,8 @@ function exportBackup() {
     version: 2,
     exportedAt: new Date().toISOString(),
     settings,
-    products
+    products,
+    customTemplate
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
@@ -1114,9 +1524,16 @@ function importBackup(e) {
       if (!Array.isArray(data.products)) throw new Error('invalid');
       products = data.products;
       settings = {...defaultSettings, ...(data.settings || {})};
+
+      if (data.customTemplate) {
+        customTemplate = normalizeTemplateData(data.customTemplate);
+        localStorage.setItem(TEMPLATE_KEY, JSON.stringify(customTemplate));
+      }
+
       persistNow();
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
       localStorage.setItem(INITIALIZED_KEY, '1');
+      updateTemplateSummary();
       $('settingsDialog').close();
       render();
     } catch {

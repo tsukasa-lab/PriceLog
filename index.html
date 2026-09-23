@@ -9,13 +9,13 @@
   <title>PriceLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./style.css?v=0.17">
+  <link rel="stylesheet" href="./style.css?v=0.18">
 </head>
 <body>
   <header class="topbar">
     <div>
       <strong>PriceLog</strong>
-      <small>Ver.0.17</small>
+      <small>Ver.0.18</small>
     </div>
     <div class="top-actions">
       <button id="btnSettings" class="icon-btn" type="button" aria-label="設定">⚙</button>
@@ -145,9 +145,13 @@
       </div>
 
       <div class="settings-block">
-        <div class="settings-title">商品テンプレート</div>
-        <div class="template-note">既存データは残して、未登録の商品だけ追加する。</div>
-        <button id="btnLoadTemplate" class="ghost backup-btn" type="button">商品テンプレートを読み込む</button>
+        <div class="settings-title">テンプレート</div>
+        <div class="template-note">選択した商品 × 選択した店舗を、既存データへ差分追加する。</div>
+        <div class="stack">
+          <button id="btnEditTemplate" class="ghost backup-btn" type="button">テンプレートファイルを作成</button>
+          <button id="btnLoadTemplate" class="ghost backup-btn" type="button">テンプレートを読み込む</button>
+        </div>
+        <div id="templateSummary" class="template-summary"></div>
         <div id="templateMessage" class="template-message"></div>
       </div>
 
@@ -171,6 +175,75 @@
         <button class="primary" value="default" type="submit">設定を保存</button>
       </div>
     </form>
+  </dialog>
+
+
+  <dialog id="templateDialog" class="dialog template-dialog">
+    <div class="template-editor">
+      <div class="dialog-head">
+        <div>
+          <strong>テンプレートファイルを作成</strong>
+          <div class="template-editor-sub">チェックした商品と店舗だけを保存する。</div>
+        </div>
+        <button id="btnCloseTemplate" class="icon-btn" type="button" aria-label="閉じる">×</button>
+      </div>
+
+      <section class="template-editor-section">
+        <div class="template-section-head">
+          <strong>商品</strong>
+          <div class="template-section-actions">
+            <button id="btnTemplateProductsAll" class="ghost mini" type="button">全選択</button>
+            <button id="btnTemplateProductsNone" class="ghost mini" type="button">全解除</button>
+            <button id="btnImportRecommendedProducts" class="ghost mini" type="button">おすすめ商品を追加</button>
+          </div>
+        </div>
+
+        <div class="template-product-add">
+          <input id="tplProductName" type="text" maxlength="60" placeholder="商品名">
+          <input id="tplProductReading" type="text" maxlength="80" placeholder="よみがな">
+          <input id="tplProductAmount" type="text" inputmode="decimal" value="100" placeholder="内容量">
+          <select id="tplProductUnit">
+            <option value="g">g</option>
+            <option value="ml">ml</option>
+            <option value="個">個</option>
+            <option value="枚">枚</option>
+            <option value="本">本</option>
+            <option value="袋">袋</option>
+            <option value="箱">箱</option>
+          </select>
+          <select id="tplProductTax"></select>
+          <button id="btnAddTemplateProduct" class="primary mini" type="button">追加</button>
+        </div>
+
+        <div id="templateProductList" class="template-entry-list"></div>
+        <div id="templateProductEmpty" class="template-empty">商品はまだないよ。</div>
+      </section>
+
+      <section class="template-editor-section">
+        <div class="template-section-head">
+          <strong>店舗</strong>
+          <div class="template-section-actions">
+            <button id="btnTemplateStoresAll" class="ghost mini" type="button">全選択</button>
+            <button id="btnTemplateStoresNone" class="ghost mini" type="button">全解除</button>
+          </div>
+        </div>
+
+        <div class="template-store-add">
+          <input id="tplStoreName" type="text" maxlength="40" placeholder="店舗名">
+          <button id="btnAddTemplateStore" class="primary mini" type="button">追加</button>
+        </div>
+
+        <div id="templateStoreList" class="template-entry-list"></div>
+        <div id="templateStoreEmpty" class="template-empty">店舗はまだないよ。</div>
+      </section>
+
+      <div id="templateEditorMessage" class="template-message"></div>
+
+      <div class="template-editor-actions">
+        <button id="btnExportTemplateFile" class="ghost" type="button">テンプレートJSONを書き出す</button>
+        <button id="btnSaveTemplate" class="primary" type="button">選択内容を保存</button>
+      </div>
+    </div>
   </dialog>
 
 
@@ -269,6 +342,6 @@
     </div>
   </template>
 
-  <script src="./app.js?v=0.17"></script>
+  <script src="./app.js?v=0.18"></script>
 </body>
 </html>
