@@ -1,0 +1,287 @@
+{
+  "app": "PriceLog",
+  "type": "product-template",
+  "version": 1,
+  "products": [
+    {
+      "name": "牛乳",
+      "reading": "ぎゅうにゅう",
+      "amount": 1000,
+      "unit": "ml",
+      "defaultTax": 8
+    },
+    {
+      "name": "卵",
+      "reading": "たまご",
+      "amount": 10,
+      "unit": "個",
+      "defaultTax": 8
+    },
+    {
+      "name": "食パン",
+      "reading": "しょくぱん",
+      "amount": 6,
+      "unit": "枚",
+      "defaultTax": 8
+    },
+    {
+      "name": "白米",
+      "reading": "はくまい",
+      "amount": 5000,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "パックご飯",
+      "reading": "ぱっくごはん",
+      "amount": 200,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "薄力粉",
+      "reading": "はくりきこ",
+      "amount": 1000,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "片栗粉",
+      "reading": "かたくりこ",
+      "amount": 300,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "砂糖",
+      "reading": "さとう",
+      "amount": 1000,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "塩",
+      "reading": "しお",
+      "amount": 1000,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "醤油",
+      "reading": "しょうゆ",
+      "amount": 1000,
+      "unit": "ml",
+      "defaultTax": 8
+    },
+    {
+      "name": "料理酒",
+      "reading": "りょうりしゅ",
+      "amount": 1000,
+      "unit": "ml",
+      "defaultTax": 8
+    },
+    {
+      "name": "みりん風調味料",
+      "reading": "みりんふうちょうみりょう",
+      "amount": 1000,
+      "unit": "ml",
+      "defaultTax": 8
+    },
+    {
+      "name": "サラダ油",
+      "reading": "さらだあぶら",
+      "amount": 1000,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "マヨネーズ",
+      "reading": "まよねーず",
+      "amount": 450,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "ケチャップ",
+      "reading": "けちゃっぷ",
+      "amount": 500,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "味噌",
+      "reading": "みそ",
+      "amount": 750,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "インスタントコーヒー",
+      "reading": "いんすたんとこーひー",
+      "amount": 80,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "ペットボトル水",
+      "reading": "ぺっとぼとるみず",
+      "amount": 2000,
+      "unit": "ml",
+      "defaultTax": 8
+    },
+    {
+      "name": "緑茶",
+      "reading": "りょくちゃ",
+      "amount": 2000,
+      "unit": "ml",
+      "defaultTax": 8
+    },
+    {
+      "name": "炭酸水",
+      "reading": "たんさんすい",
+      "amount": 500,
+      "unit": "ml",
+      "defaultTax": 8
+    },
+    {
+      "name": "ヨーグルト",
+      "reading": "よーぐると",
+      "amount": 400,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "納豆",
+      "reading": "なっとう",
+      "amount": 3,
+      "unit": "個",
+      "defaultTax": 8
+    },
+    {
+      "name": "豆腐",
+      "reading": "とうふ",
+      "amount": 300,
+      "unit": "g",
+      "defaultTax": 8
+    },
+    {
+      "name": "冷凍うどん",
+      "reading": "れいとううどん",
+      "amount": 5,
+      "unit": "個",
+      "defaultTax": 8
+    },
+    {
+      "name": "袋麺",
+      "reading": "ふくろめん",
+      "amount": 5,
+      "unit": "袋",
+      "defaultTax": 8
+    },
+    {
+      "name": "ティッシュ",
+      "reading": "てぃっしゅ",
+      "amount": 5,
+      "unit": "箱",
+      "defaultTax": 10
+    },
+    {
+      "name": "トイレットペーパー",
+      "reading": "といれっとぺーぱー",
+      "amount": 12,
+      "unit": "個",
+      "defaultTax": 10
+    },
+    {
+      "name": "キッチンペーパー",
+      "reading": "きっちんぺーぱー",
+      "amount": 4,
+      "unit": "個",
+      "defaultTax": 10
+    },
+    {
+      "name": "ラップ",
+      "reading": "らっぷ",
+      "amount": 50,
+      "unit": "m",
+      "defaultTax": 10
+    },
+    {
+      "name": "アルミホイル",
+      "reading": "あるみほいる",
+      "amount": 25,
+      "unit": "m",
+      "defaultTax": 10
+    },
+    {
+      "name": "ゴミ袋",
+      "reading": "ごみぶくろ",
+      "amount": 30,
+      "unit": "枚",
+      "defaultTax": 10
+    },
+    {
+      "name": "食器用洗剤",
+      "reading": "しょっきようせんざい",
+      "amount": 700,
+      "unit": "ml",
+      "defaultTax": 10
+    },
+    {
+      "name": "洗濯洗剤",
+      "reading": "せんたくせんざい",
+      "amount": 1000,
+      "unit": "g",
+      "defaultTax": 10
+    },
+    {
+      "name": "柔軟剤",
+      "reading": "じゅうなんざい",
+      "amount": 1000,
+      "unit": "ml",
+      "defaultTax": 10
+    },
+    {
+      "name": "ボディソープ",
+      "reading": "ぼでぃそーぷ",
+      "amount": 500,
+      "unit": "ml",
+      "defaultTax": 10
+    },
+    {
+      "name": "シャンプー",
+      "reading": "しゃんぷー",
+      "amount": 500,
+      "unit": "ml",
+      "defaultTax": 10
+    },
+    {
+      "name": "コンディショナー",
+      "reading": "こんでぃしょなー",
+      "amount": 500,
+      "unit": "ml",
+      "defaultTax": 10
+    },
+    {
+      "name": "歯磨き粉",
+      "reading": "はみがきこ",
+      "amount": 120,
+      "unit": "g",
+      "defaultTax": 10
+    },
+    {
+      "name": "ハンドソープ",
+      "reading": "はんどそーぷ",
+      "amount": 450,
+      "unit": "ml",
+      "defaultTax": 10
+    },
+    {
+      "name": "除菌ウェットティッシュ",
+      "reading": "じょきんうぇっとてぃっしゅ",
+      "amount": 60,
+      "unit": "枚",
+      "defaultTax": 10
+    }
+  ]
+}

@@ -3,6 +3,7 @@
 
 const STORAGE_KEY = 'pricelog_v02_data';
 const SETTINGS_KEY = 'pricelog_v02_settings';
+const INITIALIZED_KEY = 'pricelog_initialized_v1';
 
 const defaultSettings = {
   standardTax: 10,
@@ -32,6 +33,7 @@ $('btnBulkStore').addEventListener('click', () => setBulkMode(!bulkMode));
 $('btnBulkCancel').addEventListener('click', () => setBulkMode(false));
 $('btnBulkSelectAll').addEventListener('click', toggleBulkSelectAll);
 $('btnBulkAdd').addEventListener('click', bulkAddStore);
+$('btnLoadTemplate').addEventListener('click', loadProductTemplate);
 $('btnSettings').addEventListener('click', openSettings);
 
 $('productForm').addEventListener('submit', (e) => {
@@ -109,32 +111,45 @@ function makeId(prefix) {
 }
 
 function seedIfEmpty() {
-  if (products.length) return;
-  products = [
-    {
-      id: makeId('p'),
-      name: 'ブレンディ',
-      amount: 110,
-      unit: 'g',
-      defaultTax: 8,
-      stores: [
-        {id:makeId('s'),store:'平和堂',price:598,priceType:'inc',tax:8,couponType:'none',couponValue:0},
-        {id:makeId('s'),store:'業務スーパー',price:620,priceType:'inc',tax:8,couponType:'percent',couponValue:20},
-        {id:makeId('s'),store:'イオン',price:580,priceType:'inc',tax:8,couponType:'yen',couponValue:50}
-      ]
-    },
-    {
-      id: makeId('p'),
-      name: '牛乳',
-      amount: 1000,
-      unit: 'ml',
-      defaultTax: 8,
-      stores: [
-        {id:makeId('s'),store:'平和堂',price:218,priceType:'inc',tax:8,couponType:'none',couponValue:0}
-      ]
-    }
-  ];
-  persistNow();
+  const initialized = localStorage.getItem(INITIALIZED_KEY) === '1';
+
+  // 初回起動時だけサンプル商品を追加する。
+  // 一度初期化した後は、商品が0件でも勝手に復活させない。
+  if (initialized) return;
+
+  if (!products.length) {
+    products = [
+      {
+        id: makeId('p'),
+        name: 'ブレンディ',
+        reading: 'ぶれんでぃ',
+        amount: 110,
+        unit: 'g',
+        defaultTax: 8,
+        history: [],
+        stores: [
+          {id:makeId('s'),store:'平和堂',price:598,priceType:'inc',tax:8,couponType:'none',couponValue:0},
+          {id:makeId('s'),store:'業務スーパー',price:620,priceType:'inc',tax:8,couponType:'percent',couponValue:20},
+          {id:makeId('s'),store:'イオン',price:580,priceType:'inc',tax:8,couponType:'yen',couponValue:50}
+        ]
+      },
+      {
+        id: makeId('p'),
+        name: '牛乳',
+        reading: 'ぎゅうにゅう',
+        amount: 1000,
+        unit: 'ml',
+        defaultTax: 8,
+        history: [],
+        stores: [
+          {id:makeId('s'),store:'平和堂',price:218,priceType:'inc',tax:8,couponType:'none',couponValue:0}
+        ]
+      }
+    ];
+    persistNow();
+  }
+
+  localStorage.setItem(INITIALIZED_KEY, '1');
 }
 
 function persistSoon() {
@@ -670,6 +685,70 @@ function bulkAddStore() {
   render();
 }
 
+async function loadProductTemplate() {
+  const btn = $('btnLoadTemplate');
+  const msg = $('templateMessage');
+
+  btn.disabled = true;
+  msg.textContent = 'テンプレートを読み込み中…';
+
+  try {
+    const response = await fetch('./template-products.json?v=1', { cache: 'no-store' });
+    if (!response.ok) throw new Error('template fetch failed');
+
+    const data = await response.json();
+    if (!Array.isArray(data.products)) throw new Error('invalid template');
+
+    const existingKeys = new Set(products.map(productTemplateKey));
+    let added = 0;
+
+    data.products.forEach(item => {
+      const candidate = {
+        id: makeId('p'),
+        name: String(item.name || '').trim(),
+        reading: normalizeReadingInput(item.reading || ''),
+        amount: Number(item.amount),
+        unit: String(item.unit || '').trim(),
+        defaultTax: Number(item.defaultTax),
+        history: [],
+        stores: []
+      };
+
+      if (!candidate.name || !(candidate.amount > 0) || !candidate.unit) return;
+
+      const key = productTemplateKey(candidate);
+      if (existingKeys.has(key)) return;
+
+      products.push(candidate);
+      existingKeys.add(key);
+      added += 1;
+    });
+
+    persistNow();
+    render();
+
+    msg.textContent = added > 0
+      ? `${added}商品を追加したよ。既存の商品はそのまま。`
+      : '追加できる商品はなかったよ。既存データは変更していない。';
+  } catch (err) {
+    msg.textContent = 'テンプレートを読み込めなかったよ。ファイルがアップロードされているか確認してね。';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function productTemplateKey(product) {
+  const name = katakanaToHiragana(String(product.name || ''))
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase();
+
+  const unit = String(product.unit || '').normalize('NFKC').trim().toLowerCase();
+  const amount = Number(product.amount);
+
+  return `${name}|${Number.isFinite(amount) ? amount : ''}|${unit}`;
+}
+
 function normalizeReadingInput(value) {
   return String(value || '').trim();
 }
@@ -849,6 +928,7 @@ function importBackup(e) {
       settings = {...defaultSettings, ...(data.settings || {})};
       persistNow();
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      localStorage.setItem(INITIALIZED_KEY, '1');
       $('settingsDialog').close();
       render();
     } catch {
