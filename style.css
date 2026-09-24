@@ -290,3 +290,5 @@ button:active,.primary:active,.ghost:active,.icon-btn:active{transform:translate
   .template-editor-actions{flex-direction:column}
   .template-editor-actions .primary,.template-editor-actions .ghost{width:100%;min-height:42px}
 }
+
+.field-hint{display:block;margin-top:3px;font-size:10px;color:var(--muted)}

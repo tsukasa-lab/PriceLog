@@ -9,13 +9,13 @@
   <title>PriceLog</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./icon-192.png">
-  <link rel="stylesheet" href="./style.css?v=0.19">
+  <link rel="stylesheet" href="./style.css?v=0.20">
 </head>
 <body>
   <header class="topbar">
     <div>
       <strong>PriceLog</strong>
-      <small>Ver.0.19</small>
+      <small>Ver.0.20</small>
     </div>
     <div class="top-actions">
       <button id="btnSettings" class="icon-btn" type="button" aria-label="設定">⚙</button>
@@ -79,7 +79,8 @@
       </label>
 
       <label class="reading-field">よみがな
-        <input id="productReading" maxlength="80" placeholder="例：ぎゅうにゅう">
+        <input id="productReading" maxlength="80" placeholder="商品名から自動入力">
+        <span class="field-hint">商品名から候補を自動入力。必要ならそのまま修正できる。</span>
       </label>
 
       <div class="grid3">
@@ -342,6 +343,6 @@
     </div>
   </template>
 
-  <script src="./app.js?v=0.19"></script>
+  <script src="./app.js?v=0.20"></script>
 </body>
 </html>

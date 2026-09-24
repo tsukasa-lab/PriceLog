@@ -23,6 +23,8 @@ let storePurchaseMode = false;
 let openStoreName = null;
 let customTemplate = normalizeTemplateData(loadJson(TEMPLATE_KEY, {version:1, products:[], stores:[]}));
 let templateDraft = null;
+let readingWasManuallyEdited = false;
+let recommendedReadingMap = new Map();
 
 const $ = (id) => document.getElementById(id);
 const listEl = $('productList');
@@ -30,6 +32,7 @@ const productTemplate = $('productTemplate');
 const storeTemplate = $('storeTemplate');
 
 seedIfEmpty();
+loadRecommendedReadingMap();
 render();
 
 $('searchInput').addEventListener('input', render);
@@ -88,6 +91,18 @@ $('btnExport').addEventListener('click', exportBackup);
 $('btnImport').addEventListener('click', () => $('importFile').click());
 $('importFile').addEventListener('change', importBackup);
 $('btnCloseHistory').addEventListener('click', () => $('historyDialog').close());
+
+$('productName').addEventListener('input', () => {
+  if (!readingWasManuallyEdited) autoFillProductReading();
+});
+
+$('productName').addEventListener('blur', () => {
+  if (!readingWasManuallyEdited) autoFillProductReading();
+});
+
+$('productReading').addEventListener('input', () => {
+  readingWasManuallyEdited = true;
+});
 
 document.addEventListener('focusin', (e) => {
   const el = e.target;
@@ -1344,6 +1359,64 @@ function productTemplateKey(product) {
   return `${name}|${Number.isFinite(amount) ? amount : ''}|${unit}`;
 }
 
+function normalizeProductNameKey(value) {
+  return String(value || '').normalize('NFKC').trim().toLowerCase();
+}
+
+function hasKanji(value) {
+  return /[\u3400-\u4DBF\u4E00-\u9FFF]/.test(String(value || ''));
+}
+
+async function loadRecommendedReadingMap() {
+  try {
+    const response = await fetch('./template-products.json?v=1', { cache: 'no-store' });
+    if (!response.ok) return;
+    const data = await response.json();
+    if (!Array.isArray(data.products)) return;
+    const map = new Map();
+    data.products.forEach(item => {
+      const key = normalizeProductNameKey(item?.name);
+      const reading = normalizeReadingInput(item?.reading || '');
+      if (key && reading) map.set(key, reading);
+    });
+    recommendedReadingMap = map;
+    if ($('productDialog')?.open && !readingWasManuallyEdited && !$('productReading').value.trim()) autoFillProductReading();
+  } catch {}
+}
+
+function findKnownReading(name) {
+  const key = normalizeProductNameKey(name);
+  if (!key) return '';
+  for (const p of products) {
+    if (normalizeProductNameKey(p?.name) === key && p?.reading) return normalizeReadingInput(p.reading);
+  }
+  if (customTemplate?.products) {
+    for (const p of customTemplate.products) {
+      if (normalizeProductNameKey(p?.name) === key && p?.reading) return normalizeReadingInput(p.reading);
+    }
+  }
+  if (templateDraft?.products) {
+    for (const p of templateDraft.products) {
+      if (normalizeProductNameKey(p?.name) === key && p?.reading) return normalizeReadingInput(p.reading);
+    }
+  }
+  return recommendedReadingMap.get(key) || '';
+}
+
+function makeReadingCandidate(name) {
+  const raw = String(name || '').trim();
+  if (!raw) return '';
+  const known = findKnownReading(raw);
+  if (known) return known;
+  if (!hasKanji(raw)) return katakanaToHiragana(raw).normalize('NFKC').toLowerCase();
+  return '';
+}
+
+function autoFillProductReading() {
+  const candidate = makeReadingCandidate($('productName').value);
+  if (candidate) $('productReading').value = candidate;
+}
+
 function normalizeReadingInput(value) {
   return String(value || '').trim();
 }
@@ -1427,6 +1500,8 @@ function openProductDialog(id = null) {
   editProductId = id;
   const p = id ? products.find(x => x.id === id) : null;
 
+  readingWasManuallyEdited = !!(p?.reading);
+
   $('productDialogTitle').textContent = p ? '商品設定' : '商品追加';
   $('productName').value = p?.name ?? '';
   $('productReading').value = p?.reading ?? '';
@@ -1445,6 +1520,12 @@ function openProductDialog(id = null) {
 
 function saveProductFromDialog() {
   const name = $('productName').value.trim();
+
+  if (!$('productReading').value.trim()) {
+    const candidate = makeReadingCandidate(name);
+    if (candidate) $('productReading').value = candidate;
+  }
+
   const amount = Number($('productAmount').value);
   if (!name || !(amount > 0)) return;
 
