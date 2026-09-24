@@ -93,7 +93,10 @@ $('importFile').addEventListener('change', importBackup);
 $('btnCloseHistory').addEventListener('click', () => $('historyDialog').close());
 
 $('productName').addEventListener('input', () => {
-  if (!readingWasManuallyEdited) autoFillProductReading();
+  // よみがなを手修正していても、商品名を書き換えた瞬間に
+  // 自動更新モードへ戻す。
+  readingWasManuallyEdited = false;
+  autoFillProductReading();
 });
 
 $('productName').addEventListener('blur', () => {
@@ -1414,7 +1417,10 @@ function makeReadingCandidate(name) {
 
 function autoFillProductReading() {
   const candidate = makeReadingCandidate($('productName').value);
-  if (candidate) $('productReading').value = candidate;
+
+  // 商品名入力中は候補で強制更新する。
+  // 読みを作れない商品名なら、以前の読みを残さず一旦空欄にする。
+  $('productReading').value = candidate;
 }
 
 function normalizeReadingInput(value) {
@@ -1500,7 +1506,10 @@ function openProductDialog(id = null) {
   editProductId = id;
   const p = id ? products.find(x => x.id === id) : null;
 
-  readingWasManuallyEdited = !!(p?.reading);
+  // 商品名を触るまでは既存の読みをそのまま表示。
+  // 商品名を入力し始めたら、自動読みを強制更新する。
+  // その後、よみがな欄を手修正した時だけ自動更新を停止する。
+  readingWasManuallyEdited = false;
 
   $('productDialogTitle').textContent = p ? '商品設定' : '商品追加';
   $('productName').value = p?.name ?? '';
